@@ -1,0 +1,50 @@
+services:
+  web:
+    build: .
+    image: propre-labs:latest
+    container_name: propre-labs-web
+    restart: unless-stopped
+    networks:
+      - internal
+    expose:
+      - "80"
+    volumes:
+      # Read-only mount of the data the fetcher produces; nginx serves /data/player.json
+      - mrdata:/usr/share/nginx/html/data:ro
+    depends_on:
+      - fetcher
+
+  fetcher:
+    build: ./fetcher
+    image: propre-labs-fetcher:latest
+    container_name: propre-labs-fetcher
+    restart: unless-stopped
+    environment:
+      - API_KEY=${MARVEL_API_KEY}
+      - PLAYER=${MARVEL_PLAYER:-MrPropreter}
+      - FETCH_INTERVAL_SECONDS=${FETCH_INTERVAL_SECONDS:-300}
+      - SEASON_LABEL=${SEASON_LABEL:-Current Season}
+      - OUT_FILE=/data/player.json
+    volumes:
+      - mrdata:/data
+    networks:
+      - internal
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: propre-labs-tunnel
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - /home/vince/.cloudflared:/etc/cloudflared:ro
+    networks:
+      - internal
+    depends_on:
+      - web
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  mrdata:
