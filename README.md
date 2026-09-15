@@ -36,7 +36,7 @@ Servir [propre-labs.com](https://propre-labs.com), un tableau de bord de statist
 | `fetcher` | `node:20-alpine` | Interroge l'API tierce en tâche de fond et publie `/data/player.json` |
 
 **Build :** `node:20-alpine` (npm install, `astro build`) → copie de `dist/` dans `nginx:alpine`.
-**Déploiement :** poste de dev ─ `rsync` via SSH ─▶ Pi ─ `docker compose up -d --build`.
+**Déploiement :** poste de dev ─ `git archive` via SSH ─▶ Pi ─ `docker compose up -d --build`.
 
 ### Stack
 
@@ -70,7 +70,7 @@ La première version appelait l'API tierce depuis le navigateur, ce qui exposait
 Le fetcher écrit `player.json.tmp` puis fait un `rename`, qui est atomique sur le même système de fichiers : nginx ne sert jamais un JSON à moitié écrit.
 
 ### Moindre privilège
-Le volume de données est monté **en lecture seule** dans `web`. Seul `fetcher` peut y écrire, et la configuration du tunnel est montée en lecture seule dans `cloudflared`.
+Le volume de données est monté **en lecture seule** dans `web`. Seul `fetcher` peut y écrire, et la configuration du tunnel est montée en lecture seule dans `cloudflared`, qui tourne sous l'UID de l'hôte pour lire des identifiants restés en `600`.
 
 ### Image finale minimale
 Build multi-stage : Node et `node_modules` restent dans l'étape de build. L'image servie ne contient que nginx et les fichiers statiques, ce qui réduit sa taille et sa surface d'attaque.
@@ -97,19 +97,18 @@ Astro génère du HTML statique ; seuls le tableau de bord et le fond animé son
 - Docker et le plugin Compose
 - Accès SSH par clé depuis le poste de dev
 
-### 1. Tunnel Cloudflare (une seule fois)
+### 1. Tunnel Cloudflare (une seule fois, sur le Pi)
 
 ```bash
+mkdir -p ~/.cloudflared/propre-labs && chmod 700 ~/.cloudflared/propre-labs
 cloudflared tunnel login
-cloudflared tunnel create propre-labs              # écrit ~/.cloudflared/<TUNNEL_ID>.json
+cloudflared tunnel create propre-labs
+cloudflared tunnel token --cred-file ~/.cloudflared/propre-labs/credentials.json propre-labs
 cloudflared tunnel route dns propre-labs propre-labs.com
+cp cloudflared-config.yml ~/.cloudflared/propre-labs/config.yml     # renseigner <TUNNEL_ID>
 ```
 
-Sur le Pi, placer le fichier d'identifiants et la config dans `~/.cloudflared/` :
-
-```bash
-cp cloudflared-config.yml ~/.cloudflared/config.yml   # renseigner <TUNNEL_ID>
-```
+Le dossier est dédié : le même Pi héberge d'autres tunnels dans `~/.cloudflared`.
 
 ### 2. Variables d'environnement (sur le Pi)
 
@@ -120,9 +119,11 @@ cp .env.example ~/propre-labs/.env && chmod 600 ~/propre-labs/.env   # MARVEL_AP
 ### 3. Déployer (depuis le poste de dev)
 
 ```bash
-./deploy.sh                                  # rsync vers le Pi puis docker compose up -d --build
+./deploy.sh                                  # git archive HEAD → Pi, puis docker compose up -d --build
 PI_HOST=192.168.1.50 ./deploy.sh             # hôte, utilisateur et dossier surchargeables
 ```
+
+`git archive` n'envoie que les fichiers versionnés du commit courant : ni `node_modules`, ni build local, ni secret ne peuvent partir sur le Pi par erreur.
 
 ### Développement local
 
@@ -146,5 +147,5 @@ curl -s https://propre-labs.com/data/player.json | head -c 200
 
 - `cloudflare/cloudflared:latest` n'est pas épinglé : fixer une version pour des déploiements reproductibles.
 - Pas de `healthcheck` sur `web` et `fetcher` : à ajouter pour que Compose détecte un collecteur bloqué.
-- Déploiement manuel par `rsync` : cible suivante, un workflow GitHub Actions avec build multi-arch (`docker buildx`) poussé vers un registre, puis `docker compose pull` sur le Pi.
+- Déploiement manuel depuis le poste de dev : cible suivante, un workflow GitHub Actions avec build multi-arch (`docker buildx`) poussé vers un registre, puis `docker compose pull` sur le Pi.
 - Les statistiques « all time » par personnage sont saisies à la main dans le front : l'API ne les expose pas.

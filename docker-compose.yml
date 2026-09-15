@@ -34,9 +34,12 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: propre-labs-tunnel
     restart: unless-stopped
-    command: tunnel --config /etc/cloudflared/config.yml run
+    # Run as the host user so the 0600 tunnel credentials stay unreadable to anyone else.
+    user: "${TUNNEL_UID:-1000}:${TUNNEL_GID:-1000}"
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
     volumes:
-      - /home/vince/.cloudflared:/etc/cloudflared:ro
+      # Dedicated directory: the Pi also hosts other tunnels in ~/.cloudflared.
+      - ${CLOUDFLARED_DIR:-/home/vince/.cloudflared/propre-labs}:/etc/cloudflared:ro
     networks:
       - internal
     depends_on:

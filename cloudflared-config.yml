@@ -1,12 +1,13 @@
-# Example tunnel config. Copy to ~/.cloudflared/config.yml on the Pi.
-# docker-compose.yml mounts ~/.cloudflared read-only at /etc/cloudflared.
+# Example tunnel config. Copy to ~/.cloudflared/propre-labs/config.yml on the Pi.
+# docker-compose.yml mounts that directory read-only at /etc/cloudflared.
 #
 #   cloudflared tunnel login
-#   cloudflared tunnel create propre-labs             # writes ~/.cloudflared/<TUNNEL_ID>.json
+#   cloudflared tunnel create propre-labs
+#   cloudflared tunnel token --cred-file ~/.cloudflared/propre-labs/credentials.json propre-labs
 #   cloudflared tunnel route dns propre-labs propre-labs.com
 
 tunnel: <TUNNEL_ID>
-credentials-file: /etc/cloudflared/<TUNNEL_ID>.json  # path as seen from inside the container
+credentials-file: /etc/cloudflared/credentials.json   # path as seen from inside the container
 
 ingress:
   # "web" resolves on the internal Docker network: nginx is never published on the host.

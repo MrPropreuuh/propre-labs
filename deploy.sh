@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
+# Ships the committed HEAD to the Pi and rebuilds the stack.
+# git archive only sends tracked files: no node_modules, build output or local secrets.
 set -euo pipefail
 
 PI_USER="${PI_USER:-vince}"
-PI_HOST="${PI_HOST:-192.168.1.12}"
+PI_HOST="${PI_HOST:-192.168.1.15}"
 REMOTE_DIR="${REMOTE_DIR:-/home/${PI_USER}/propre-labs}"
 
-echo "==> Syncing project to Pi..."
-rsync -avz --exclude 'node_modules' --exclude 'dist' --exclude '.git' --exclude '.ssh' --exclude '.claude' \
-  ./ "${PI_USER}@${PI_HOST}:${REMOTE_DIR}/"
+if [ -n "$(git status --porcelain)" ]; then
+  echo "WARNING: uncommitted changes are NOT deployed (git archive ships HEAD only)."
+fi
+
+echo "==> Shipping $(git rev-parse --short HEAD) to ${PI_USER}@${PI_HOST}:${REMOTE_DIR}"
+git archive --format=tar HEAD | ssh "${PI_USER}@${PI_HOST}" "mkdir -p '${REMOTE_DIR}' && tar -x -C '${REMOTE_DIR}'"
 
 echo "==> Building and starting containers on Pi..."
-ssh "${PI_USER}@${PI_HOST}" bash -s <<'REMOTE'
+ssh "${PI_USER}@${PI_HOST}" "REMOTE_DIR='${REMOTE_DIR}' bash -s" <<'REMOTE'
 set -euo pipefail
-cd /home/vince/propre-labs
+cd "$REMOTE_DIR"
 
-# Ensure .env exists
 if [ ! -f .env ]; then
   echo "ERROR: .env not found on Pi. Create it from .env.example first."
   exit 1
 fi
 
-# Build & restart
 docker compose pull cloudflared
 docker compose up -d --build
 
