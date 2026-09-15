@@ -2,7 +2,7 @@
 
 ## 🎯 Objectif
 
-Servir [propre-labs.com](https://propre-labs.com), un tableau de bord de statistiques de jeu mis à jour en continu, depuis un Raspberry Pi domestique : sans port ouvert sur la box, sans clé API exposée au navigateur, et sans que le trafic des visiteurs n'influe sur la consommation de l'API tierce.
+Auto-héberger un site web alimenté par une API tierce (tableau de bord de statistiques de jeu mis à jour en continu) sur un Raspberry Pi domestique : sans port ouvert sur la box, sans clé API exposée au navigateur, et sans que le trafic des visiteurs n'influe sur la consommation de l'API tierce.
 
 ---
 
